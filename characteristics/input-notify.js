@@ -1,4 +1,5 @@
 const execSync = require('child_process').execSync
+const exec = require('child_process').exec
 let util = require('util')
 let bleno = require('bleno')
 let UUID = require('../sugar-uuid')
@@ -9,6 +10,8 @@ const iface_path = '/etc/network/interfaces'
 const concatTag = '%&%'
 const endTag = '&#&'
 
+const fetch = require("node-fetch");
+const camera_config = require('../camera_config.json');
 let argv = process.argv
 if (argv.length > 2) config.key = process.argv[2]
 
@@ -144,57 +147,65 @@ NotifyMassageCharacteristic.prototype.onNotify = function() {
 }
 
 async function setWifi (input_ssid, input_password) {
-  let data = fs.readFileSync(conf_path, 'utf8')
-  let wifiRegx = /(network={[^\}]+})/g
-  let ssidRegx = /ssid="([^"]*)"/
-  let priorityRegx = /priority=([\d]*)/
-  let wifiMatch = data.match(wifiRegx)
-  let wifiArray = []
-  let maxPriority = 0
-  if (wifiMatch) {
-    for (let i in wifiMatch) {
-      let str = wifiMatch[i]
-      let ssid = str.match(ssidRegx)
-      ssid = ssid ? ssid[1] : ''
-      let priority = str.match(priorityRegx)
-      priority = priority ? priority[1] : 0
-      maxPriority = Math.max(maxPriority, priority)
-      if (input_ssid !== ssid) {
-        wifiArray.push(str)
+  console.log(`${input_ssid} ${input_password}`)
+  bt_data = JSON.parse(input_ssid);
+  course = bt_data.course;
+  let data = {};
+  
+  camera_config.cameras.forEach(async (camera) => {
+    // Check camera server status
+    camera_status = await fetch(camera.ping).then(async (res) => await res.json()).catch(err => {return {status: err.toString()}})
+    // Get image
+    if(camera_status.status == 'ok') {
+      data[camera.device] = {status: 'ok', image: await fetch(camera.capture).then(async (res) => await res.text())}
+    } else {
+      data[camera.device] = {status: camera_status.status, image: null}
+    }
+
+  });
+
+  // Delete old photo
+  fs.stat('/home/pi/Smart-Attendance-System-RPI-master/temp.jpg', function (err, stats) {
+ 
+    if (!err) {    
+      fs.unlink('/home/pi/Smart-Attendance-System-RPI-master/temp.jpg', function(err){
+          if(err) return console.error(err);
+      });  
+    } 
+
+    // Capture New Image
+    exec("/usr/bin/python /home/pi/Smart-Attendance-System-RPI-master/capture_image.py", (error, stdout, stderr) => {
+      if (error) {
+        console.error(`exec error: ${error}`)
+        return
       }
-      data = data.replace(wifiMatch[i], '')
-    }
-  }
-  let prefix = data.replace('Country=', 'country=')
-  wifiArray.push(`network={\n\t\tssid="${input_ssid}"\n\t\tscan_ssid=1\n\t\tpsk="${input_password}"\n\t\tpriority=${maxPriority+1}\n\t}`)
-  let content = `${prefix}\n\t${wifiArray.join('\n\t')}`
-  fs.writeFileSync(conf_path, content)
-  // check if wlan0 available, otherwise let reboot
-  if (!isWlan0Ok()) {
-    setMessage('OK. Please reboot.')
-    return
-  }
-  try{
-    execSync('killall wpa_supplicant')
-  } catch (e) {
-    console.log(e.toString())
-  }
-  let resMsg = ''
-  let maxTryTimes = 10
-  while (maxTryTimes > 0) {
-    // try every 2 second
-    await sleep(2)
-    try{
-      let msg = execSync('wpa_supplicant -B -iwlan0 -c/etc/wpa_supplicant/wpa_supplicant.conf')
-      resMsg = msg.toString()
-      break
-    } catch (e) {
-      console.log(e)
-      resMsg = 'Commond failed.'
-    }
-    maxTryTimes--
-  }
-  setMessage(maxTryTimes.toString() + ' ' + resMsg)
+  
+      // Check if new photo was successfully taken
+      fs.stat('/home/pi/Smart-Attendance-System-RPI-master/temp.jpg', async function (err, stats) {
+   
+        if (err) {
+            data.master = {status : 'ok', image: null}
+            console.error(err);
+        } else {
+          data.master = {status: 'ok', image: fs.readFileSync('/home/pi/Smart-Attendance-System-RPI-master/temp.jpg', 'base64')};
+        }
+
+        // Send data to Server
+        // console.log(data)
+
+        await fetch(camera_config.api, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({course: course, data: data})
+        })
+          .then(async (res) => console.error(await res.text()))
+          .catch(err => console.error(err));
+      })
+    })
+  });
+
 }
 
 function isWlan0Ok() {

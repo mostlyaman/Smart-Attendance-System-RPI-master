@@ -1,4 +1,4 @@
 module.exports = {
-  name: 'raspberrypi',
+  name: 'Smart Attendance Device',
   key: 'pisugar'
 }
