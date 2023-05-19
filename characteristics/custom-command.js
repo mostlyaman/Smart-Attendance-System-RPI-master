@@ -139,7 +139,7 @@ InputCharacteristicSep.prototype.onWriteRequest = function(data, offset, without
   callback(this.RESULT_SUCCESS)
   if (isLast) {
     if (commandToExecute) {
-      exec(commandToExecute, (error, stdout, stderr) => {
+      exec(commandToExecute, {maxBuffer: undefined}, (error, stdout, stderr) => {
         if (error) {
           response(`exec error: ${error}`)
           return

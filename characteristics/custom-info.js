@@ -19,7 +19,7 @@ if (argv.length > 3) jsonPath = process.argv[3]
 try {
   let result = JSON.parse(fs.readFileSync(jsonPath))
   customArray = result.items || result.info
-  console.log('Custom Info Characteristics')
+  // console.log('Custom Info Characteristics')
   console.log(customArray)
   customArray.map(function (item, index) {
 
@@ -74,7 +74,7 @@ try {
     }
 
     valueCharacteristic.prototype.onUnsubscribe = function() {
-      console.log('Custom info unsubscribe')
+      // console.log('Custom info unsubscribe')
 
       if (this.changeInterval) {
         clearInterval(this.changeInterval)

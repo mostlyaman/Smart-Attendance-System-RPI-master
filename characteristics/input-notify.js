@@ -149,8 +149,8 @@ NotifyMassageCharacteristic.prototype.onNotify = function() {
 async function setWifi (input_ssid, input_password) {
   console.log(`${input_ssid} ${input_password}`)
   bt_data = JSON.parse(input_ssid);
-  course = bt_data.course;
   let data = {};
+  data.course = bt_data.course;
   
   camera_config.cameras.forEach(async (camera) => {
     // Check camera server status
@@ -190,18 +190,27 @@ async function setWifi (input_ssid, input_password) {
           data.master = {status: 'ok', image: fs.readFileSync('/home/pi/Smart-Attendance-System-RPI-master/temp.jpg', 'base64')};
         }
 
-        // Send data to Server
+        // Store Data Locally
         // console.log(data)
-
+	console.log(data.course)
         await fetch(camera_config.api, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({course: course, data: data})
+          body: JSON.stringify(data)
         })
-          .then(async (res) => console.error(await res.text()))
+          .then(async (res) => {
+            if(res.status != 200) console.error(await res.text()); 
+            console.log("Done serving Bluetooth Request - ", res.status);          
+          })
           .catch(err => console.error(err));
+
+        // fs.writeFile('temp.json', JSON.stringify(data), 'utf-8', (err) => {
+        //   if(err) return console.log(`Error writing results: ${err.toString()}`)
+        //   console.log("Done serving Bluetooth Request")
+        // })
+
       })
     })
   });
