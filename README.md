@@ -5,4 +5,6 @@ This repository hosts the code for the Smart Attendance system Raspberry Pi Mast
 Start Bluetooth server using the following command:
 
 
-`sudo node index.js pisugar custom_config.json`
+```sh
+sudo node index.js pisugar custom_config.json
+```
